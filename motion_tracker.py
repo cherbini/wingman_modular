@@ -37,10 +37,10 @@ class MotionTracker:
         self.coordinate_systems = CoordinateSystems(camera_intrinsics, tag_size, servo_mounting)
 
         # Initialize DynamixelController (device port, baud rate, pan servo ID, tilt servo ID)
-        self.dynamixel_controller = DynamixelController("/dev/ttyUSB0", 1000000, 1, 2)
+        self.dynamixel_controller = DynamixelController("/dev/ttyDXL", 1000000, 1, 2)
         self.camera_distance = camera_distance  # Initialize camera_distance attribute
 
-
+        self.dynamixel_controller.servo_test()
 
 
     def setup_pipeline(self):
@@ -150,30 +150,7 @@ class MotionTracker:
 
         self.prev_rois = rois
 
-    def servo_test(self):
-        # Get the current position of the pan servo
-        initial_position = self.dynamixel_controller.get_present_position(self.dynamixel_controller.PAN_SERVO_ID)
-        print("servo test initial position" + str(initial_position))
-    
-        # Convert +/- 10 degrees to position values (ticks) based on the servo's resolution
-        # The conversion factor depends on the servo model (e.g., 4096 ticks per 360 degrees for MX-28)
-        ticks_per_degree = 4096 / 360
-        offset = int(10 * ticks_per_degree)
-    
-        # Move the pan servo +10 degrees
-        self.dynamixel_controller.set_goal_position(self.dynamixel_controller.PAN_SERVO_ID, initial_position + offset)
-        time.sleep(1)  # Wait for 1 second
-    
-        # Move the pan servo -10 degrees
-        self.dynamixel_controller.set_goal_position(self.dynamixel_controller.PAN_SERVO_ID, initial_position - offset)
-        time.sleep(1)  # Wait for 1 second
-    
-        # Return the pan servo to its initial position
-        self.dynamixel_controller.set_goal_position(self.dynamixel_controller.PAN_SERVO_ID, initial_position)
-        time.sleep(1)  # Wait for 1 second
-
     def run(self):
-        self.servo_test()
         qNn = self.device.getOutputQueue(name="nn", maxSize=4, blocking=False)
         qCam = self.device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
     

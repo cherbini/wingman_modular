@@ -1,4 +1,5 @@
 import dynamixel_sdk as sdk
+import time
 
 class DynamixelController:
     def __init__(self, device_port, baudrate, pan_servo_id, tilt_servo_id):
@@ -68,10 +69,25 @@ class DynamixelController:
         # Close port
         self.portHandler.closePort()
 
+    def servo_test(self):
+        # Get initial position of PAN servo
+        initial_position = self.get_present_position(self.PAN_SERVO_ID)
+
+        # Move PAN servo +10 degrees from initial position
+        self.set_goal_position(self.PAN_SERVO_ID, initial_position + 10)
+        time.sleep(1)  # Wait for 1 second
+
+        # Move PAN servo -10 degrees from initial position
+        self.set_goal_position(self.PAN_SERVO_ID, initial_position - 10)
+        time.sleep(1)  # Wait for 1 second
+
+        # Move PAN servo back to initial position
+        self.set_goal_position(self.PAN_SERVO_ID, initial_position)
+
 # Usage example
 if __name__ == "__main__":
     # Parameters: device port, baud rate, pan servo ID, tilt servo ID
-    dynamixel_controller = DynamixelController("/dev/ttyUSB0", 1000000, 1, 2)
+    dynamixel_controller = DynamixelController("/dev/ttyDXL", 500000, 1, 2)
 
     # Set goal position for pan servo to 1000 and tilt servo to 2000
     dynamixel_controller.set_goal_position(dynamixel_controller.PAN_SERVO_ID, 1000)

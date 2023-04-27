@@ -13,7 +13,7 @@ def main():
     tag_size = (0.1,0.1)
 
     # Define the servo mounting configuration (e.g., offset, orientation, etc.)
-    theta = 0.1
+    theta = 1
     servo_mounting = [[cos(theta), -sin(theta)],  # Transformation matrix
                   [sin(theta), cos(theta)]]
 
