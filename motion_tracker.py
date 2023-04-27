@@ -2,6 +2,8 @@ import numpy as np
 import cv2
 import depthai as dai
 import time
+from dynamixel_control import DynamixelController
+from coordinate_systems import CoordinateSystems
 from kalman_tracker import KalmanTracker
 from utils import (
     get_roi_area,
@@ -13,7 +15,10 @@ from utils import (
 )
 
 class MotionTracker:
-    def __init__(self):
+    WINDOW_WIDTH = 720  # Width of the video frame
+    WINDOW_HEIGHT = 720  # Height of the video frame
+
+    def __init__(self, camera_intrinsics, tag_size, servo_mounting, camera_distance, archive_size=5):
         self.prev_rois = []
         self.decay_time = 3
         self.decay_info = []
@@ -25,6 +30,18 @@ class MotionTracker:
         self.archive = []
         self.kf = KalmanTracker()
         self.pipeline, self.device = self.setup_pipeline()
+        self.camera_intrinsics = camera_intrinsics
+        self.tag_size = tag_size
+        self.servo_mounting = servo_mounting
+        self.archive_size = archive_size
+        self.coordinate_systems = CoordinateSystems(camera_intrinsics, tag_size, servo_mounting)
+
+        # Initialize DynamixelController (device port, baud rate, pan servo ID, tilt servo ID)
+        self.dynamixel_controller = DynamixelController("/dev/ttyUSB0", 1000000, 1, 2)
+        self.camera_distance = camera_distance  # Initialize camera_distance attribute
+
+
+
 
     def setup_pipeline(self):
         p = dai.Pipeline()
@@ -70,7 +87,7 @@ class MotionTracker:
 
     def process_frame(self, diff_frame, video_frame, current_time):
         rois = extract_regions_of_interest(diff_frame)
-    
+
         # Update the archive
         self.archive.append(rois)
         if len(self.archive) > self.archive_size:
@@ -87,16 +104,13 @@ class MotionTracker:
                 larger_object_center += np.array([x + w / 2, y + h / 2])
                 roi_count += 1
     
-        if roi_count > 0:
-            larger_object_center /= roi_count
-            cv2.circle(video_frame, tuple(larger_object_center.astype(int)), 5, (0, 255, 255), -1)
-    
         # Process regions of interest and update decay_info
         self.decay_info = [(roi, *process_motion_data(prev_roi, roi, 720, 720), current_time) for prev_roi, roi in zip(self.prev_rois, rois) if prev_roi is not None]
-    
+        
         for roi, azimuth, velocity, direction, roi_time in self.decay_info:
             x, y, w, h = roi
             center = get_center(x, y, w, h)
+
             lead_time = 1  # Change this value to adjust the distance between the yellow and green dots
     
             # Get the interception point and limit its distance from the yellow dot
@@ -109,8 +123,31 @@ class MotionTracker:
             # Draw the green dot for the interception point
             cv2.circle(video_frame, (int(interception_x), int(interception_y)), 5, (0, 255, 0), -1)
     
-        self.prev_rois = rois
+        # Draw the yellow detection point
+        if roi_count > 0:
+            larger_object_center /= roi_count
+            cv2.circle(video_frame, tuple(larger_object_center.astype(int)), 5, (0, 255, 255), -1)
     
+            # Calculate deviation from center of frame
+            frame_center = np.array([self.WINDOW_WIDTH / 2, self.WINDOW_HEIGHT / 2])
+            deviation = larger_object_center - frame_center
+            
+            # Convert deviation to servo coordinates
+            servo_deviation = self.coordinate_systems.image_to_servo(deviation, self.camera_distance)
+
+            
+            # Update servo goal positions based on deviation
+            pan_position = self.dynamixel_controller.get_present_position(self.dynamixel_controller.PAN_SERVO_ID)
+            tilt_position = self.dynamixel_controller.get_present_position(self.dynamixel_controller.TILT_SERVO_ID)
+
+            # Convert the values to integers
+            new_pan_position = int(pan_position + servo_deviation[0])
+            new_tilt_position = int(tilt_position + servo_deviation[1])
+        
+            self.dynamixel_controller.set_goal_position(self.dynamixel_controller.PAN_SERVO_ID, new_pan_position)
+            self.dynamixel_controller.set_goal_position(self.dynamixel_controller.TILT_SERVO_ID, new_tilt_position)
+
+        self.prev_rois = rois
     def run(self):
         qNn = self.device.getOutputQueue(name="nn", maxSize=4, blocking=False)
         qCam = self.device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
@@ -141,8 +178,9 @@ class MotionTracker:
     
         cv2.destroyAllWindows()
         self.device.close()
-    
-    if __name__ == "__main__":
-        motion_tracker = MotionTracker()
-        motion_tracker.run()
-    
+        self.dynamixel_controller.close()
+
+if __name__ == "__main__":
+    motion_tracker = MotionTracker()
+    motion_tracker.run()
+
