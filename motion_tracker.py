@@ -103,6 +103,12 @@ class MotionTracker:
             for x, y, w, h in sorted_rois:
                 larger_object_center += np.array([x + w / 2, y + h / 2])
                 roi_count += 1
+
+        # Draw the yellow detection point
+        if roi_count > 0:
+            larger_object_center /= roi_count
+            cv2.circle(video_frame, tuple(larger_object_center.astype(int)), 5, (0, 255, 255), -1)
+        
     
         # Process regions of interest and update decay_info
         self.decay_info = [(roi, *process_motion_data(prev_roi, roi, 720, 720), current_time) for prev_roi, roi in zip(self.prev_rois, rois) if prev_roi is not None]
@@ -122,11 +128,6 @@ class MotionTracker:
     
             # Draw the green dot for the interception point
             cv2.circle(video_frame, (int(interception_x), int(interception_y)), 5, (0, 255, 0), -1)
-    
-        # Draw the yellow detection point
-        if roi_count > 0:
-            larger_object_center /= roi_count
-            cv2.circle(video_frame, tuple(larger_object_center.astype(int)), 5, (0, 255, 255), -1)
     
             # Calculate deviation from center of frame
             frame_center = np.array([self.WINDOW_WIDTH / 2, self.WINDOW_HEIGHT / 2])
@@ -148,7 +149,31 @@ class MotionTracker:
             self.dynamixel_controller.set_goal_position(self.dynamixel_controller.TILT_SERVO_ID, new_tilt_position)
 
         self.prev_rois = rois
+
+    def servo_test(self):
+        # Get the current position of the pan servo
+        initial_position = self.dynamixel_controller.get_present_position(self.dynamixel_controller.PAN_SERVO_ID)
+        print("servo test initial position" + str(initial_position))
+    
+        # Convert +/- 10 degrees to position values (ticks) based on the servo's resolution
+        # The conversion factor depends on the servo model (e.g., 4096 ticks per 360 degrees for MX-28)
+        ticks_per_degree = 4096 / 360
+        offset = int(10 * ticks_per_degree)
+    
+        # Move the pan servo +10 degrees
+        self.dynamixel_controller.set_goal_position(self.dynamixel_controller.PAN_SERVO_ID, initial_position + offset)
+        time.sleep(1)  # Wait for 1 second
+    
+        # Move the pan servo -10 degrees
+        self.dynamixel_controller.set_goal_position(self.dynamixel_controller.PAN_SERVO_ID, initial_position - offset)
+        time.sleep(1)  # Wait for 1 second
+    
+        # Return the pan servo to its initial position
+        self.dynamixel_controller.set_goal_position(self.dynamixel_controller.PAN_SERVO_ID, initial_position)
+        time.sleep(1)  # Wait for 1 second
+
     def run(self):
+        self.servo_test()
         qNn = self.device.getOutputQueue(name="nn", maxSize=4, blocking=False)
         qCam = self.device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
     
