@@ -109,11 +109,14 @@ class MotionTracker:
             larger_object_center /= roi_count
             cv2.circle(video_frame, tuple(larger_object_center.astype(int)), 5, (0, 255, 255), -1)
         
-    
+        # Initialize servo_deviation with a default value
+        servo_deviation = np.zeros(2)
+
         # Process regions of interest and update decay_info
         self.decay_info = [(roi, *process_motion_data(prev_roi, roi, 720, 720), current_time) for prev_roi, roi in zip(self.prev_rois, rois) if prev_roi is not None]
         
         for roi, azimuth, velocity, direction, roi_time in self.decay_info:
+ 
             x, y, w, h = roi
             center = get_center(x, y, w, h)
 
@@ -137,14 +140,14 @@ class MotionTracker:
             servo_deviation = self.coordinate_systems.image_to_servo(deviation, self.camera_distance)
 
             
-            # Update servo goal positions based on deviation
-            pan_position = self.dynamixel_controller.get_present_position(self.dynamixel_controller.PAN_SERVO_ID)
-            tilt_position = self.dynamixel_controller.get_present_position(self.dynamixel_controller.TILT_SERVO_ID)
+        # Update servo goal positions based on deviation (if servo_deviation is not default value)
+        if not np.all(servo_deviation == 0):
+            pan_position, tilt_position = self.dynamixel_controller.get_present_position()
 
             # Convert the values to integers
             new_pan_position = int(pan_position + servo_deviation[0])
             new_tilt_position = int(tilt_position + servo_deviation[1])
-        
+
             self.dynamixel_controller.set_goal_position(self.dynamixel_controller.PAN_SERVO_ID, new_pan_position)
             self.dynamixel_controller.set_goal_position(self.dynamixel_controller.TILT_SERVO_ID, new_tilt_position)
 
