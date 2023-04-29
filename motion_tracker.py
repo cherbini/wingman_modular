@@ -87,6 +87,8 @@ class MotionTracker:
 
     def process_frame(self, diff_frame, video_frame, current_time):
         rois = extract_regions_of_interest(diff_frame)
+        print("Extracted ROIs:", rois)
+        print("Previous ROIs:", self.prev_rois)
 
         # Update the archive
         self.archive.append(rois)
@@ -103,23 +105,28 @@ class MotionTracker:
             for x, y, w, h in sorted_rois:
                 larger_object_center += np.array([x + w / 2, y + h / 2])
                 roi_count += 1
-
+    
         # Draw the yellow detection point
         if roi_count > 0:
             larger_object_center /= roi_count
             cv2.circle(video_frame, tuple(larger_object_center.astype(int)), 5, (0, 255, 255), -1)
-        
+            print("Yellow dot (larger object center) location: x={}, y={}".format(*larger_object_center))  # Added print statement
+    
         # Initialize servo_deviation with a default value
         servo_deviation = np.zeros(2)
-
+    
         # Process regions of interest and update decay_info
         self.decay_info = [(roi, *process_motion_data(prev_roi, roi, 720, 720), current_time) for prev_roi, roi in zip(self.prev_rois, rois) if prev_roi is not None]
-        
+        print("Decay info:", self.decay_info)
+
+    
         for roi, azimuth, velocity, direction, roi_time in self.decay_info:
- 
+            print("Velocity:", velocity)
+            print("Direction:", direction)
+    
             x, y, w, h = roi
             center = get_center(x, y, w, h)
-
+    
             lead_time = 1  # Change this value to adjust the distance between the yellow and green dots
     
             # Get the interception point and limit its distance from the yellow dot
@@ -131,27 +138,28 @@ class MotionTracker:
     
             # Draw the green dot for the interception point
             cv2.circle(video_frame, (int(interception_x), int(interception_y)), 5, (0, 255, 0), -1)
+            print("Green dot (interception point) location: x={}, y={}".format(interception_x, interception_y))  # Added print statement
     
-            # Calculate deviation from center of frame
+            # Calculate deviation from center of frame based on the GREEN dot (interception point)
             frame_center = np.array([self.WINDOW_WIDTH / 2, self.WINDOW_HEIGHT / 2])
-            deviation = larger_object_center - frame_center
-            
+            deviation = np.array([interception_x, interception_y]) - frame_center
+    
             # Convert deviation to servo coordinates
             servo_deviation = self.coordinate_systems.image_to_servo(deviation, self.camera_distance)
-
-            
-        # Update servo goal positions based on deviation (if servo_deviation is not default value)
-        if not np.all(servo_deviation == 0):
-            pan_position, tilt_position = self.dynamixel_controller.get_present_position()
-
-            # Convert the values to integers
-            new_pan_position = int(pan_position + servo_deviation[0])
-            new_tilt_position = int(tilt_position + servo_deviation[1])
-
-            self.dynamixel_controller.set_goal_position(self.dynamixel_controller.PAN_SERVO_ID, new_pan_position)
-            self.dynamixel_controller.set_goal_position(self.dynamixel_controller.TILT_SERVO_ID, new_tilt_position)
-
-        self.prev_rois = rois
+    
+            if not np.all(servo_deviation == 0):
+                # Get current servo positions
+                pan_position, tilt_position = self.dynamixel_controller.get_present_position()
+                # Calculate new goal positions based on deviation
+                new_pan_position = int(pan_position + servo_deviation[0])
+                new_tilt_position = int(tilt_position + servo_deviation[1])
+    
+                # Update the goal positions of the servos
+                self.dynamixel_controller.set_goal_position(self.dynamixel_controller.PAN_SERVO_ID, new_pan_position)
+                self.dynamixel_controller.set_goal_position(self.dynamixel_controller.TILT_SERVO_ID, new_tilt_position)
+        self.prev_rois = rois.copy()
+        self.frame_number += 1
+    
 
     def run(self):
         qNn = self.device.getOutputQueue(name="nn", maxSize=4, blocking=False)

@@ -37,8 +37,8 @@ class CoordinateSystems:
 if __name__ == "__main__":
     # Sample camera intrinsic parameters
     camera_intrinsics = {
-        'focal_length': (500, 500),
-        'principal_point': (320, 240)
+        'focal_length': (.52,.52),
+        'principal_point': (360,360)
     }
 
     # Sample tag size (width, height) in meters

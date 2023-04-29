@@ -2,6 +2,13 @@ import dynamixel_sdk as sdk
 import time
 
 class DynamixelController:
+
+    # Define valid ranges for PAN and TILT servos
+    PAN_MIN_POSITION = 648  # Adjust as needed
+    PAN_MAX_POSITION = 2448  # Adjust as needed
+    TILT_MIN_POSITION = 1548  # Adjust as needed
+    TILT_MAX_POSITION = 2548  # Adjust as needed
+
     def __init__(self, device_port, baudrate, pan_servo_id, tilt_servo_id):
         # Protocol version
         self.PROTOCOL_VERSION = 2.0
@@ -55,31 +62,33 @@ class DynamixelController:
         )
         if dxl_comm_result != self.COMM_SUCCESS:
             raise Exception("Error occurred while enabling/disabling torque")
+    # Clamp servo position to the valid range
+    @staticmethod
+    def clamp_servo_position(position, min_position, max_position):
+        return max(min(position, max_position), min_position)
 
-    def set_goal_position(self, pan_position, tilt_position):
-        # Ensure pan_position and tilt_position are within valid range [0, 4095]
-        pan_position = min(max(pan_position, 0), 4095)
-        tilt_position = min(max(tilt_position, 0), 4095)
 
-        # Allocate goal position values into byte array for pan servo
-        param_goal_position_pan = [
-            pan_position & 0xFF,
-            (pan_position >> 8) & 0xFF,
-            (pan_position >> 16) & 0xFF,
-            (pan_position >> 24) & 0xFF
+
+    def set_goal_position(self, servo_id, goal_position):
+        # Check if servo_id is PAN or TILT and clamp goal_position accordingly
+        if servo_id == self.PAN_SERVO_ID:
+            goal_position = self.clamp_servo_position(goal_position, self.PAN_MIN_POSITION, self.PAN_MAX_POSITION)
+        elif servo_id == self.TILT_SERVO_ID:
+            goal_position = self.clamp_servo_position(goal_position, self.TILT_MIN_POSITION, self.TILT_MAX_POSITION)
+
+        # Ensure goal_position is within valid range [0, 4095]
+        goal_position = min(max(goal_position, 0), 4095)
+
+        # Allocate goal position values into byte array for servo
+        param_goal_position = [
+            goal_position & 0xFF,
+            (goal_position >> 8) & 0xFF,
+            (goal_position >> 16) & 0xFF,
+            (goal_position >> 24) & 0xFF
         ]
 
-        # Allocate goal position values into byte array for tilt servo
-        param_goal_position_tilt = [
-            tilt_position & 0xFF,
-            (tilt_position >> 8) & 0xFF,
-            (tilt_position >> 16) & 0xFF,
-            (tilt_position >> 24) & 0xFF
-        ]
-
-        # Add goal position values for pan and tilt servos
-        self.groupSyncWrite.addParam(self.PAN_SERVO_ID, param_goal_position_pan)
-        self.groupSyncWrite.addParam(self.TILT_SERVO_ID, param_goal_position_tilt)
+        # Add goal position value for servo
+        self.groupSyncWrite.addParam(servo_id, param_goal_position)
 
         # Execute SyncWrite
         dxl_comm_result = self.groupSyncWrite.txPacket()
@@ -94,14 +103,15 @@ class DynamixelController:
         dxl_comm_result = self.groupSyncRead.txRxPacket()
         if dxl_comm_result != self.COMM_SUCCESS:
             raise Exception("Error occurred while reading present position")
-
+    
         # Get pan servo present position value
         pan_present_position = self.groupSyncRead.getData(self.PAN_SERVO_ID, self.ADDR_MX_PRESENT_POSITION, self.LEN_PRESENT_POSITION)
-
+    
         # Get tilt servo present position value
         tilt_present_position = self.groupSyncRead.getData(self.TILT_SERVO_ID, self.ADDR_MX_PRESENT_POSITION, self.LEN_PRESENT_POSITION)
-
+    
         return pan_present_position, tilt_present_position
+
 
     def close(self):
         # Disable Dynamixel torque
@@ -111,25 +121,19 @@ class DynamixelController:
         # Close port
         self.portHandler.closePort()
 
+
     def servo_test(self):
-        # Get initial positions of PAN and TILT servos (no additional arguments needed)
-        pan_initial_position, tilt_initial_position = self.get_present_position()
+        # Define the square path for the servos
+        pan_offset = 1400
+        tilt_offset = 500
+        pan_positions = [2048, 2048 + pan_offset, 2048 + pan_offset, 2048 - pan_offset, 2048 - pan_offset, 2048]
+        tilt_positions = [2048, 2048, 2048 + tilt_offset, 2048 + tilt_offset, 2048 - tilt_offset, 2048]
 
-        # Define the step size for the test (e.g., 10 ticks)
-        step_size = 10
-
-        # Move PAN servo +10 degrees from initial position (clamp to valid range)
-        new_pan_position = min(max(pan_initial_position + step_size, 0), 4095)
-        self.set_goal_position(new_pan_position, tilt_initial_position)
-        time.sleep(1)  # Wait for 1 second
-
-        # Move PAN servo -10 degrees from initial position (clamp to valid range)
-        new_pan_position = min(max(pan_initial_position - step_size, 0), 4095)
-        self.set_goal_position(new_pan_position, tilt_initial_position)
-        time.sleep(1)  # Wait for 1 second
-
-        # Move PAN servo back to initial position
-        self.set_goal_position(pan_initial_position, tilt_initial_position)
+        # Move the servos in the square path
+        for pan_pos, tilt_pos in zip(pan_positions, tilt_positions):
+            self.set_goal_position(self.PAN_SERVO_ID, pan_pos)
+            self.set_goal_position(self.TILT_SERVO_ID, tilt_pos)
+            time.sleep(1)  # Wait for 1 second for each move
 
 # Usage example
 if __name__ == "__main__":
@@ -138,6 +142,6 @@ if __name__ == "__main__":
 
     # Perform servo test
     dynamixel_controller.servo_test()
-    
+
     # Close and release resources
     dynamixel_controller.close()
