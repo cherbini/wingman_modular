@@ -147,6 +147,7 @@ class MotionTracker:
             # Convert deviation to servo coordinates
             servo_deviation = self.coordinate_systems.image_to_servo(deviation, self.camera_distance)
     
+            print("Servo Deviation", servo_deviation)
             if not np.all(servo_deviation == 0):
                 # Get current servo positions
                 pan_position, tilt_position = self.dynamixel_controller.get_present_position()

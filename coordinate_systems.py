@@ -11,6 +11,10 @@ class CoordinateSystems:
         # Orientation and mounting of the servos relative to the camera
         self.servo_mounting = np.array(servo_mounting)
 
+        # Define scale factors for servo movement
+        self.servo_scale_x = 1200  # Adjust as needed
+        self.servo_scale_y = 1200  # Adjust as needed
+
     def image_to_realworld(self, tag_center, camera_distance):
         fx, fy = self.camera_intrinsics['focal_length']
         cx, cy = self.camera_intrinsics['principal_point']
@@ -31,6 +35,11 @@ class CoordinateSystems:
         # Convert image coordinates to servo coordinates
         realworld_coords = self.image_to_realworld(tag_center, camera_distance)
         servo_coords = self.realworld_to_servo(realworld_coords)
+
+        # Scale the deviation by the scale factors
+        servo_coords[0] *= self.servo_scale_x
+        servo_coords[1] *= self.servo_scale_y
+
         return servo_coords
 
 # Usage example
