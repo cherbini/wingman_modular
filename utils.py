@@ -26,29 +26,8 @@ def get_interception_point(x: float, y: float, velocity: float, direction: float
     interception_y = y + delta_y
     return interception_x, interception_y
 
-def extract_regions_of_interest(diff, threshold=0.2, min_side_length=25):
-    gray_diff = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
-    ret, mask = cv2.threshold(gray_diff, threshold * 255, 255, cv2.THRESH_BINARY)
-    mask = mask.astype(np.uint8)
-
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    largest_roi = None
-    largest_area = 0
-
-    for cnt in contours:
-        x, y, w, h = cv2.boundingRect(cnt)
-
-        if w >= min_side_length and h >= min_side_length:
-            area = w * h
-            if area > largest_area:
-                largest_area = area
-                largest_roi = (x, y, w, h)
-
-    return [largest_roi] if largest_roi else []
-
-def get_center(x: float, y: float, w: float, h: float) -> List[float]:
-    return [x + w / 2, y + h / 2, 1]
+def get_center(x: float, y: float, w: float, h: float) -> Tuple[float, float]:
+    return [x + w / 2, y + h / 2]
 
 def process_motion_data(prev_roi, curr_roi, frame_width, frame_height):
     prev_x, prev_y, prev_w, prev_h = prev_roi

@@ -12,8 +12,8 @@ class CoordinateSystems:
         self.servo_mounting = np.array(servo_mounting)
 
         # Define scale factors for servo movement
-        self.servo_scale_x = 1200  # Adjust as needed
-        self.servo_scale_y = 1200  # Adjust as needed
+        self.servo_scale_x = 10# Adjust as needed
+        self.servo_scale_y = 10# Adjust as needed
 
     def image_to_realworld(self, tag_center, camera_distance):
         fx, fy = self.camera_intrinsics['focal_length']

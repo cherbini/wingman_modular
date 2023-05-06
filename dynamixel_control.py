@@ -6,7 +6,7 @@ class DynamixelController:
     # Define valid ranges for PAN and TILT servos
     PAN_MIN_POSITION = 648  # Adjust as needed
     PAN_MAX_POSITION = 2448  # Adjust as needed
-    TILT_MIN_POSITION = 1548  # Adjust as needed
+    TILT_MIN_POSITION = 648  # Adjust as needed
     TILT_MAX_POSITION = 2548  # Adjust as needed
 
     def __init__(self, device_port, baudrate, pan_servo_id, tilt_servo_id):
@@ -124,8 +124,8 @@ class DynamixelController:
 
     def servo_test(self):
         # Define the square path for the servos
-        pan_offset = 1400
-        tilt_offset = 500
+        pan_offset = 1000
+        tilt_offset = 1000
         pan_positions = [2048, 2048 + pan_offset, 2048 + pan_offset, 2048 - pan_offset, 2048 - pan_offset, 2048]
         tilt_positions = [2048, 2048, 2048 + tilt_offset, 2048 + tilt_offset, 2048 - tilt_offset, 2048]
 
